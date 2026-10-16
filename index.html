@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gajur Black Jack — Multiplayer Pro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<style>
+  :root{--felt:#0f5a3a;--felt2:#1a7a4f;--wood:#3a2410;--gold:#e8c24a;--gold2:#ffd86b;--text:#f4efe0;--card:#faf7f0;--red:#c0282b;--black:#1a1a1a;--glass:rgba(0,0,0,.28);}
+  body.theme-blue{--felt:#1b4f7a;--felt2:#2469a0;--gold:#7dd3fc;--gold2:#bae6fd}
+  body.theme-burgundy{--felt:#6b1a2a;--felt2:#8a2438;--gold:#f5c518;--gold2:#fde68a}
+  body.theme-night{--felt:#1a1a2e;--felt2:#2a2a4a;--gold:#a78bfa;--gold2:#c4b5fd}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',system-ui,Arial,sans-serif;min-height:100vh;transition:background .3s;
+    background:radial-gradient(ellipse at 50% 30%, color-mix(in srgb,var(--felt) 35%,#0a3d26) 0%, #0a3d26 55%, #041a10 100%);color:var(--text);display:flex;flex-direction:column;align-items:center;padding:10px}
+  header{text-align:center} header h1{margin:0;font-size:clamp(1.6rem,4vw,2.6rem);color:var(--gold2);letter-spacing:2px;text-shadow:0 2px 6px #000}
+  header .sub{opacity:.7;font-size:.85rem}
+  .panel{background:var(--glass);border-radius:12px;padding:14px;max-width:1180px;width:100%;border:1px solid rgba(255,255,255,.1);margin:8px 0;backdrop-filter:blur(6px)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center}
+  input,select,button{padding:8px 12px;border-radius:8px;border:none;font-size:1rem}
+  button{cursor:pointer;font-weight:bold;background:var(--gold);color:#111;transition:.15s}
+  button:hover{filter:brightness(1.1)}
+  button:disabled{background:#555;color:#bbb;cursor:not-allowed;filter:grayscale(1)}
+  button.secondary{background:#e8e4d8} button.danger{background:#e74c3c;color:#fff} button.success{background:#2ecc71;color:#072010} button.ghost{background:transparent;color:var(--text);border:1px solid rgba(255,255,255,.25)}
+  button.small{padding:5px 9px;font-size:.8rem}
+  .status{opacity:.8;font-size:.9rem;text-align:center;margin:6px 0}
+  .conn-box{background:rgba(0,0,0,.35);padding:8px 12px;border-radius:8px;word-break:break-all;font-family:monospace;margin-top:6px;text-align:center}
+  .avatar{width:26px;height:26px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:6px;box-shadow:0 0 0 2px rgba(255,255,255,.3)}
+  .table{background:radial-gradient(ellipse at center,var(--felt2) 0%,var(--felt) 60%);border:12px solid #3a2410;border-radius:40px;min-height:440px;padding:20px;position:relative;width:min(1020px,100%);box-shadow:inset 0 0 60px rgba(0,0,0,.4)}
+  .seat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:12px}
+  .seat{background:rgba(0,0,0,.28);border-radius:12px;padding:10px;border:2px solid transparent;transition:.2s}
+  .seat.active{border-color:var(--gold2);box-shadow:0 0 0 3px rgba(255,216,107,.25) inset}
+  .seat.offline{opacity:.45;filter:grayscale(1)}
+  .seat .name{font-weight:bold;color:var(--gold2);display:flex;align-items:center;gap:6px}
+  .cards{display:flex;gap:6px;flex-wrap:wrap;min-height:60px;align-items:center;margin-top:6px}
+  .card{width:48px;height:68px;background:var(--card);border-radius:6px;border:1px solid #bbb;position:relative;font-weight:bold;box-shadow:0 3px 6px rgba(0,0,0,.3);font-size:.8rem;transition:transform .2s}
+  .card.red{color:var(--red)} .card.black{color:var(--black)}
+  .card .corner{position:absolute;font-size:11px;line-height:1;font-weight:bold}
+  .card .corner.tl{top:3px;left:5px} .card .corner.br{bottom:3px;right:5px;transform:rotate(180deg)}
+  .card .center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:20px}
+  .card.back{background:repeating-linear-gradient(45deg,#1a3a6b,#1a3a6b 4px,#244a85 4px,#244a85 8px)}
+  .score{display:inline-block;background:rgba(0,0,0,.35);padding:2px 8px;border-radius:8px;font-weight:bold;margin-left:6px}
+  .msg{min-height:30px;text-align:center;font-weight:bold;color:var(--gold2);font-size:1.1rem;margin:8px 0}
+  .controls{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+  .chat{max-height:160px;overflow-y:auto;font-size:.85rem;margin-top:8px;border-top:1px solid rgba(255,255,255,.1);padding-top:6px}
+  .chat .entry{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+  .chat .entry.sys{opacity:.7;font-style:italic}
+  #chatInput{flex:1;min-width:180px}
+  .mod-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:900px){.mod-grid{grid-template-columns:1fr}}
+  .player-manage{background:rgba(255,255,255,.05);border-radius:8px;padding:8px;margin:6px 0}
+  .player-manage .row{justify-content:space-between}
+  .small-label{font-size:.8rem;opacity:.75}
+  details summary{cursor:pointer;color:var(--gold);font-weight:bold}
+  .field{display:flex;flex-direction:column;gap:4px;margin:6px 0}
+  .field label{font-size:.8rem;opacity:.8}
+  .field input,.field select{width:100%}
+  .log-list{max-height:120px;overflow-y:auto;font-size:.8rem;opacity:.85}
+  .topbar{max-width:1180px;width:100%;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:2px}
+  .topbar button{padding:6px 10px;font-size:.8rem}
+  .toast-container{position:fixed;right:16px;bottom:16px;z-index:10001;display:flex;flex-direction:column;gap:8px}
+  .toast{background:rgba(13,30,20,.92);color:#f4efe0;border:1px solid rgba(255,255,255,.15);border-left:4px solid var(--gold);border-radius:10px;padding:10px 14px;min-width:220px;max-width:360px;font-size:.85rem;box-shadow:0 8px 24px rgba(0,0,0,.4);animation:toastIn .25s ease, toastOut .3s ease 3.5s forwards;backdrop-filter:blur(8px)}
+  .toast.success{border-left-color:#2ecc71} .toast.danger{border-left-color:#e74c3c} .toast.info{border-left-color:#5dade2}
+  @keyframes toastIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
+  @keyframes toastOut{to{transform:translateX(120%);opacity:0}}
+  .turn-bar{height:4px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden;margin-top:8px}
+  .turn-bar .fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));width:0%;transition:width .2s linear}
+  .seat{position:relative}
+  .seat .chips-badge{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:2px 8px;font-size:.75rem}
+  .avatar-ring{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:900;color:#111;box-shadow:0 0 0 2px rgba(255,255,255,.35),0 2px 6px rgba(0,0,0,.35)}
+  @media (prefers-reduced-motion: reduce){.toast,.card,.seat,.table{animation:none !important;transition:none !important}}
+  body.fun-disco{animation:discoBg 1.2s infinite linear}
+  @keyframes discoBg{0%{filter:hue-rotate(0)}100%{filter:hue-rotate(360deg)}}
+  body.fun-rainbow .card{animation:rainbowCard 2s infinite linear;filter:hue-rotate(0)}
+  @keyframes rainbowCard{0%{filter:hue-rotate(0)}100%{filter:hue-rotate(360deg)}}
+  body.fun-hugecards .card{transform:scale(1.35)}
+  body.fun-invert{filter:invert(1) hue-rotate(180deg)}
+  body.fun-shake .table{animation:shake 0.25s infinite}
+  @keyframes shake{0%{transform:translate(2px,1px)}25%{transform:translate(-1px,2px)}50%{transform:translate(-3px,-1px)}75%{transform:translate(2px,-2px)}100%{transform:translate(1px,1px)}}
+  body.fun-matrix{background:linear-gradient(180deg,#001100,#000);color:#0f0}
+  .confetti-burst{position:fixed;pointer-events:none;z-index:9999;animation:confettiDrop 1.8s ease forwards}
+  @keyframes confettiDrop{0%{opacity:1;transform:translateY(0) rotate(0)}100%{opacity:0;transform:translateY(100vh) rotate(720deg)}}
+  body.fun-pride{background:linear-gradient(120deg,#ff5f6d,#ff9671,#f9f871,#66dd99,#4facfe,#a18cd1);color:#000}
+  body.fun-pride .panel{background:rgba(255,255,255,.7);color:#111}
+  body.fun-pride .table{border-color:#fff}
+  body.fun-pride::before{content:"🏳️‍🌈 Gajur Pride — Happy Pride Month!";position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10000;background:linear-gradient(90deg,#ff5f6d,#f9f871,#66dd99,#4facfe,#a18cd1);color:#111;padding:8px 16px;border-radius:999px;font-weight:900;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+</style>
+</head>
+<body class="theme-emerald">
+
+<header>
+  <h1>♠ Gajur Black Jack — Multiplayer Pro ♣</h1>
+  <div class="sub">Host een tafel, deel de code, speel met custom namen en een mod menu</div>
+</header>
+
+<div class="panel" id="profilePanel">
+  <h2>Profiel</h2>
+  <div class="row">
+    <input id="nameInput" placeholder="Je naam" maxlength="24" />
+    <label style="display:flex;align-items:center;gap:6px">
+      <span class="small-label">Kleur</span>
+      <input type="color" id="colorInput" value="#e8c24a" />
+    </label>
+    <button id="randomNameBtn" class="secondary small">Random</button>
+  </div>
+  <p class="small-label" style="text-align:center;margin:6px 0 0">Naam en kleur worden opgeslagen in je browser.</p>
+</div>
+
+<div class="panel" id="connPanel">
+  <h2>Verbinding</h2>
+  <div class="row">
+    <button id="hostBtn" class="success">Host tafel</button>
+    <input id="roomInput" placeholder="Room code (host id)" />
+    <button id="joinBtn" class="secondary">Join</button>
+    <button id="copyBtn" class="ghost small">📋 Room code</button>
+  </div>
+  <div class="status" id="statusText">Niet verbonden.</div>
+  <div class="conn-box" id="roomCode" style="display:none"></div>
+</div>
+
+<div class="panel" id="gamePanel" style="display:none">
+  <div class="topbar">
+    <button id="toggleChatBtn" class="ghost small">💬 Chat</button>
+    <button id="modToggleBtn" class="ghost small" style="display:none">🛠 Mod Menu</button>
+    <button id="updateProfileBtn" class="ghost small">✏️ Naam bijwerken</button>
+  </div>
+
+  <div class="msg" id="message">Wacht op host…</div>
+  <h2 id="tableTitle">Gajur Tafel</h2>
+
+  <div class="table">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span style="font-weight:bold">Dealer <span class="score" id="dealerScore">-</span></span>
+      <span class="small-label">Shoe: <span id="shoeCount">0</span> • Thema: <span id="themeLabel">Emerald</span></span>
+    </div>
+    <div class="cards" id="dealerCards"></div>
+    <div class="turn-bar" id="turnBar"><div class="fill" id="turnFill"></div></div>
+    <div class="seat-grid" id="seats"></div>
+  </div>
+
+  <div class="row" style="margin-top:12px">
+    <input id="betInput" type="number" value="25" min="1" style="width:90px" />
+    <button id="placeBetBtn" class="secondary">Zet inzet</button>
+    <button id="startBtn" class="success" style="display:none">Start ronde</button>
+  </div>
+
+  <div class="controls" id="controls" style="display:none">
+    <button id="hitBtn">Hit (H)</button>
+    <button id="standBtn">Stand (S)</button>
+    <button id="doubleBtn">Double (D)</button>
+  </div>
+
+  <div id="modPanel" class="panel" style="display:none;margin-top:12px">
+    <h2>🛠 Mod Menu (host)</h2>
+    <div class="mod-grid">
+      <div class="field">
+        <label>Tafelnaam</label>
+        <input id="modTableName" />
+        <button id="modTableNameBtn" class="small">Toepassen</button>
+      </div>
+      <div class="field">
+        <label>Thema</label>
+        <select id="modTheme">
+          <option value="emerald">Emerald</option>
+          <option value="blue">Blue</option>
+          <option value="burgundy">Burgundy</option>
+          <option value="night">Night</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Aantal decks</label>
+        <select id="modDecks"><option>1</option><option>2</option><option selected>4</option><option>6</option><option>8</option></select>
+      </div>
+      <div class="field">
+        <label>Soft 17</label>
+        <select id="modS17"><option value="true" selected>S17 stand</option><option value="false">H17 hit</option></select>
+      </div>
+      <div class="field">
+        <label>Blackjack payout</label>
+        <select id="modBJ"><option value="3:2" selected>3:2</option><option value="6:5">6:5</option></select>
+      </div>
+      <div class="field">
+        <label>Double</label>
+        <select id="modDouble"><option value="any" selected>Elke 2</option><option value="9-11">9-11</option><option value="10-11">10-11</option><option value="none">Geen</option></select>
+      </div>
+      <div class="field">
+        <label>Max split handen</label>
+        <select id="modMaxSplit"><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+      </div>
+      <div class="field">
+        <label>Insurance</label>
+        <select id="modInsurance"><option value="true" selected>Aan</option><option value="false">Uit</option></select>
+      </div>
+      <div class="field">
+        <label>Perfect Pairs side bet</label>
+        <select id="modPP"><option value="true">Aan</option><option value="false" selected>Uit</option></select>
+      </div>
+      <div class="field">
+        <label>Chips bij reset</label>
+        <input id="modResetChips" type="number" value="1000" />
+      </div>
+    </div>
+
+    <details open style="margin-top:10px">
+      <summary>Spelers beheren</summary>
+      <div id="managePlayers"></div>
+      <div class="row" style="margin-top:8px">
+        <button id="modResetBank" class="secondary small">Reset alle bankrolls</button>
+        <button id="modGiveAll" class="secondary small">Geef iedereen +100</button>
+        <button id="modClearHands" class="secondary small">Hands wissen (lobby)</button>
+        <button id="modPauseBtn" class="secondary small">Pauzeer/Herstart</button>
+      </div>
+    </details>
+
+    <details style="margin-top:8px">
+      <summary>Acties & logs</summary>
+      <div class="row" style="margin-top:8px">
+        <input id="modAnnounceInput" placeholder="Aankondiging…" style="flex:1;min-width:180px" />
+        <button id="modAnnounceBtn" class="small">Verstuur</button>
+        <button id="modEndRoundBtn" class="danger small">Beëindig ronde</button>
+        <button id="modNewShoeBtn" class="secondary small">Nieuwe shoe</button>
+      </div>
+      <div class="log-list" id="modLog"></div>
+    </details>
+  </div>
+
+  <div class="panel" style="display:none;margin-top:12px" id="funModsPanel">
+    <h2>🎉 Fun mods (host)</h2>
+    <div class="row">
+      <button class="small secondary" data-fun="disco">Disco modus</button>
+      <button class="small secondary" data-fun="rainbow">Rainbow cards</button>
+      <button class="small secondary" data-fun="hugecards">Giant cards</button>
+      <button class="small secondary" data-fun="invert">Invert themes</button>
+      <button class="small secondary" data-fun="shake">Screen shake</button>
+      <button class="small secondary" data-fun="matrix">Matrix mode</button>
+      <button class="small secondary" data-fun="confetti">Confetti burst</button>
+      <button class="small secondary" data-fun="pride">🏳️‍🌈 Gajur Pride</button>
+    </div>
+    <p class="small-label" style="margin-top:8px">Mods gelden voor alle spelers via de host.</p>
+  </div>
+
+  <div id="chatPanel" class="panel" style="display:none;margin-top:12px">
+    <h2>💬 Chat</h2>
+    <div class="chat" id="chat"></div>
+    <div class="row" style="margin-top:8px">
+      <input id="chatInput" placeholder="Bericht…" />
+      <button id="chatSendBtn" class="secondary small">Verstuur</button>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:12px">
+    <h2>🖥️ Console</h2>
+    <div class="row">
+      <input id="consoleInput" placeholder="Typ 's' of 'mod' voor mod menu…" style="flex:1;min-width:180px" />
+      <button id="consoleRunBtn" class="secondary small">Run</button>
+    </div>
+    <div class="chat" id="consoleOut"></div>
+  </div>
+
+  <div class="row" style="margin-top:10px;opacity:.75;font-size:.85rem">
+    Spelers: <span id="playerList"></span>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  const SUITS=['♠','♥','♦','♣'];
+  const RANKS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+  const COLORS=['#e74c3c','#2c8fd6','#2ecc71','#9b59b6','#f39c12','#1abc9c','#e91e63','#34495e'];
+
+  let peer=null, connToHost=null, isHost=false, myId=null, myProfile={name:'Player',color:'#e8c24a'};
+
+  // host game state
+  let game=null;
+  let clientState=null;
+
+  const $=id=>document.getElementById(id);
+  function status(msg){ $('statusText').textContent=msg; toast(msg,'info'); }
+  function toast(msg,type='info'){
+    const c=$('toastContainer'); if(!c) return;
+    const t=document.createElement('div'); t.className='toast '+type; t.textContent=msg;
+    c.appendChild(t); setTimeout(()=>{ if(t.parentNode) t.parentNode.removeChild(t); },3900);
+  }
+  function esc(s){ return (s||'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+
+  // ---------- storage ----------
+  function loadProfile(){
+    try{
+      const raw=localStorage.getItem('gajur_mp_profile');
+      if(raw){ const o=JSON.parse(raw); if(o.name) myProfile.name=o.name; if(o.color) myProfile.color=o.color; }
+    }catch(e){}
+    $('nameInput').value=myProfile.name;
+    $('colorInput').value=myProfile.color;
+  }
+  function saveProfile(){ localStorage.setItem('gajur_mp_profile', JSON.stringify(myProfile)); }
+
+  function loadPrefs(){ try{ const r=localStorage.getItem('gajur_mp_prefs'); return r?JSON.parse(r):{}; }catch(e){return{};} }
+  function savePrefs(p){ localStorage.setItem('gajur_mp_prefs', JSON.stringify(p)); }
+
+  // ---------- card helpers ----------
+  function cardValue(c){ if(['J','Q','K'].includes(c.rank))return 10; if(c.rank==='A')return 11; return parseInt(c.rank,10);}
+  function handTotal(cards){ let t=0,a=0; for(const c of cards){t+=cardValue(c); if(c.rank==='A')a++;} while(t>21&&a>0){t-=10;a--;} return t;}
+  function isRed(s){return s==='♥'||s==='♦';}
+  function isBJ(cards){return cards.length===2 && handTotal(cards)===21;}
+  function createCardEl(card,hidden=false){
+    const div=document.createElement('div');
+    if(hidden){div.className='card back';return div;}
+    div.className='card '+(isRed(card.suit)?'red':'black');
+    const tl=document.createElement('div');tl.className='corner tl';tl.textContent=card.rank+card.suit;
+    const br=document.createElement('div');br.className='corner br';br.textContent=card.rank+card.suit;
+    const center=document.createElement('div');center.className='center';center.textContent=card.suit;
+    div.appendChild(tl);div.appendChild(br);div.appendChild(center);
+    return div;
+  }
+
+  // ---------- deck ----------
+  function buildShoe(n){ const d=[]; for(let k=0;k<n;k++) for(const s of SUITS) for(const r of RANKS) d.push({suit:s,rank:r});
+    for(let i=d.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[d[i],d[j]]=[d[j],d[i]];} return d;}
+  function ensureShoe(){ if(!game.shoe||game.shoe.length<30) game.shoe=buildShoe(game.rules.decks); }
+  function draw(){ ensureShoe(); return game.shoe.pop(); }
+
+  // ---------- host game init ----------
+  function defaultRules(){ return {decks:4,s17:true,bjPay:'3:2',double:'any',maxSplit:2,insurance:true,ppSidebet:false}; }
+  function ensureGame(){
+    if(game) return;
+    game={
+      tableName:'Gajur Tafel', theme:'emerald', rules:defaultRules(), paused:false, funMods:[],
+      players:{}, order:[], conns:{}, dealerHand:[], shoe:buildShoe(4),
+      phase:'lobby', currentTurn:0, log:[], chat:[]
+    };
+    addPlayer(myId, myProfile.name, myProfile.color, true);
+  }
+  function addPlayer(id,name,color,local=false){
+    if(game.players[id]){ game.players[id].name=name; game.players[id].color=color; return; }
+    game.players[id]={id,name,color,color:color,chips:1000,bet:0,ppBet:0,hand:[],status:'lobby',ready:false,local};
+    game.order.push(id);
+  }
+  function removePlayer(id){
+    if(!game.players[id]) return;
+    const name=game.players[id].name;
+    delete game.players[id];
+    game.order=game.order.filter(x=>x!==id);
+    delete game.conns[id];
+    logSystem(name+' verliet de tafel.');
+  }
+  function logSystem(m){ game.log.unshift({t:Date.now(),m}); if(game.log.length>30) game.log.pop(); }
+  function logMsg(from,m){ game.chat.unshift({from,m,t:Date.now()}); if(game.chat.length>50) game.chat.pop(); }
+  function hostOnly(cb){ if(isHost) cb(); }
+
+  function publicState(){
+    const players=game.order.map(id=>{
+      const p=game.players[id];
+      return {id,name:p.name,color:p.color,chips:p.chips,bet:p.bet,ppBet:p.ppBet,hand:p.hand,status:p.status,ready:p.ready};
+    });
+    const dealerMasked = game.phase==='playing' ? game.dealerHand.map((c,i)=> i===0? null : c) : game.dealerHand;
+    return {
+      tableName:game.tableName, theme:game.theme, rules:game.rules, paused:game.paused,
+      phase:game.phase, currentTurn:game.currentTurn, currentTurnId: game.order[game.currentTurn]||null,
+      players, dealerHand:dealerMasked, shoeCount:game.shoe.length,
+      log:game.log, chat:game.chat, funMods:game.funMods
+    };
+  }
+  function broadcast(){
+    const st=publicState();
+    applyState(st,true);
+    Object.values(game.conns).forEach(c=>{ if(c&&c.open) c.send({type:'state',state:st}); });
+  }
+  function sendTo(id,msg){ const c=game.conns[id]; if(c&&c.open) c.send(msg); }
+
+  function handleJoin(conn,name,color){
+    if(game.players[conn.peer]) { game.players[conn.peer].name=name; game.players[conn.peer].color=color; }
+    else {
+      game.conns[conn.peer]=conn;
+      addPlayer(conn.peer, name||'Gast', color||randomColor(), false);
+    }
+    conn.on('data', d=>handleClientData(conn.peer,d));
+    conn.on('close', ()=>{ removePlayer(conn.peer); broadcast(); });
+    logSystem((name||'Gast')+' deed mee.');
+    broadcast();
+  }
+  function handleClientData(id,data){
+    if(!game.players[id]) return;
+    const p=game.players[id];
+    if(data.type==='bet'){
+      if(game.phase!=='lobby'||game.paused) return;
+      const amt=Math.max(0, Math.min(p.chips, parseInt(data.amount,10)||0));
+      p.bet=amt; broadcast();
+    } else if(data.type==='ppbet'){
+      if(game.phase!=='lobby'||game.paused) return;
+      const amt=Math.max(0, Math.min(p.chips, parseInt(data.amount,10)||0));
+      p.ppBet=amt; broadcast();
+    } else if(data.type==='action'){
+      if(!game.paused) performAction(id,data.action);
+    } else if(data.type==='profile'){
+      p.name=data.name||p.name; p.color=data.color||p.color; broadcast();
+    } else if(data.type==='chat'){
+      const t=(data.text||'').trim().slice(0,200);
+      if(t){ logMsg(p.name, t); broadcast(); }
+    } else if(data.type==='ready'){
+      p.ready=!!data.ready; broadcast();
+    }
+    // mod messages from clients ignored (host only)
+  }
+  function performAction(id, action){
+    if(game.phase!=='playing' || game.paused) return;
+    const idx=game.order.indexOf(id);
+    if(idx!==game.currentTurn) return;
+    const p=game.players[id];
+    if(!p || p.status!=='active') return;
+    if(action==='hit'){
+      p.hand.push(draw()); 
+      const t=handTotal(p.hand);
+      if(t>21) p.status='bust';
+      else if(t===21) p.status='stand';
+      broadcast();
+      if(p.status!=='active') advanceTurn();
+    } else if(action==='stand'){
+      p.status='stand'; broadcast(); advanceTurn();
+    } else if(action==='double'){
+      if(p.hand.length!==2 || p.chips<p.bet) return;
+      p.chips-=p.bet; p.bet*=2;
+      p.hand.push(draw());
+      const t=handTotal(p.hand);
+      p.status = t>21?'bust':'stand';
+      broadcast(); advanceTurn();
+    }
+  }
+  function advanceTurn(){
+    let next=-1;
+    for(let i=game.currentTurn+1;i<game.order.length;i++){
+      if(game.players[game.order[i]].status==='active'){ next=i; break; }
+    }
+    if(next>=0){
+      game.currentTurn=next; broadcast();
+    } else {
+      dealerPlay();
+    }
+  }
+  function dealerPlay(){
+    game.phase='dealer';
+    broadcast();
+    setTimeout(()=>{
+      while(handTotal(game.dealerHand)<17){ game.dealerHand.push(draw()); }
+      settle();
+    },800);
+  }
+  function perfectPairPay(p){
+    if(!game.rules.ppSidebet || !p.ppBet) return;
+    const a=p.hand[0], b=p.hand[1];
+    let mult=0, label='';
+    if(a.rank===b.rank && a.suit===b.suit){ mult=25; label='Perfect Pair'; }
+    else if(a.rank===b.rank && isRed(a.suit)===isRed(b.suit)){ mult=12; label='Colored Pair'; }
+    else if(a.rank===b.rank){ mult=6; label='Mixed Pair'; }
+    if(mult>0){ const pay=p.ppBet*mult+p.ppBet; p.chips+=pay; logSystem(p.name+' won side bet '+label+' +'+pay); }
+  }
+  function settle(){
+    const dv=handTotal(game.dealerHand);
+    const dealerBJ=isBJ(game.dealerHand);
+    game.order.forEach(id=>{
+      const p=game.players[id];
+      if(p.status!=='lobby' && p.bet>0){
+        p.chips -= p.bet; // already? safety: ensure deduction handled at deal? handled here
+      }
+    });
+    // revert: bets are placed at start? We deduct here only if not already; to avoid double, track. Simpler: don't deduct here; deduct at start.
+  }
+
+  // Better accounting: place bets at round start (deduct). settle pays.
+  function startRound(){
+    if(!isHost||game.phase!=='lobby'||game.paused) return;
+    // ensure bets and ppbets, deduct chips
+    game.order.forEach(id=>{
+      const p=game.players[id];
+      if(!p.bet||p.bet<1) p.bet=25;
+      if(p.bet>p.chips) p.bet=Math.max(1,p.chips);
+      if(game.rules.ppSidebet){
+        if(!p.ppBet) p.ppBet=0;
+        if(p.ppBet>p.chips) p.ppBet=0;
+      } else p.ppBet=0;
+      p.chips -= p.bet;
+      if(p.ppBet>0) p.chips -= p.ppBet;
+      p.hand=[draw(),draw()];
+      p.status = isBJ(p.hand)? 'blackjack':'active';
+      perfectPairPay(p);
+    });
+    game.dealerHand=[draw(),draw()];
+    game.phase='playing';
+    game.currentTurn=0;
+    while(game.currentTurn<game.order.length && game.players[game.order[game.currentTurn]].status!=='active'){ game.currentTurn++; }
+    if(game.currentTurn>=game.order.length){ dealerPlay(); return; }
+    logSystem('Ronde gestart.');
+    broadcast();
+  }
+
+  // rewrite settle without extra deduction:
+  function settleRound(){
+    const dv=handTotal(game.dealerHand);
+    const dealerBJ=isBJ(game.dealerHand);
+    game.order.forEach(id=>{
+      const p=game.players[id];
+      if(p.status==='lobby' || p.bet<=0) return;
+      if(p.status==='bust') return; // lose bet already deducted
+      const pv=handTotal(p.hand);
+      const playerBJ=isBJ(p.hand);
+      if(dealerBJ && playerBJ){ p.chips += p.bet; logSystem(p.name+' push BJ'); }
+      else if(dealerBJ){ /* lose */ logSystem(p.name+' verliest van dealer BJ'); }
+      else if(playerBJ){ const pay = game.rules.bjPay==='3:2'? Math.floor(p.bet*2.5): Math.floor(p.bet*2.2); p.chips+=pay; logSystem(p.name+' Blackjack! +'+pay); }
+      else if(dv>21 || pv>dv){ p.chips += p.bet*2; logSystem(p.name+' wint'); }
+      else if(pv===dv){ p.chips += p.bet; logSystem(p.name+' push'); }
+      else { logSystem(p.name+' verliest'); }
+    });
+    game.phase='lobby';
+    game.order.forEach(id=>{ const p=game.players[id]; p.hand=[]; p.bet=0; p.ppBet=0; p.status='lobby'; p.ready=false; });
+    game.dealerHand=[]; game.currentTurn=0;
+    broadcast();
+  }
+  // alias
+  function settle(){ settleRound(); }
+
+  function dealerPlay(){ game.phase='dealer'; broadcast();
+    setTimeout(()=>{ while(handTotal(game.dealerHand)<17) game.dealerHand.push(draw()); settle(); },800); }
+
+  // remove incorrect earlier settleRound duplicate by redefining settleRound only once; JS uses last function declaration (hoisted) -> last wins. We'll define settleRound here already. Good.
+  // Wait settle() alias defined before settleRound? Functions hoisted; settle() calls settleRound which defined below? Function declarations hoisted, so fine.
+
+  // mod actions (host)
+  function modAction(action,payload){
+    if(!isHost) return;
+    switch(action){
+      case 'setTableName': game.tableName=payload; logSystem('Tafel hernoemd naar '+payload); break;
+      case 'setTheme': game.theme=payload; document.body.className='theme-'+payload; sendTheme(); break;
+      case 'applyRules': game.rules=Object.assign(game.rules,payload); logSystem('Regels bijgewerkt'); break;
+      case 'kick': removePlayer(payload); sendTo(payload,{type:'kicked'}); break;
+      case 'adjustChips': { const p=game.players[payload.id]; if(p){ p.chips += payload.amount; logSystem(p.name+' chips aangepast '+payload.amount); } } break;
+      case 'forceStand': if(game.players[payload]) performAction(payload,'stand'); break;
+      case 'resetBank': game.order.forEach(id=>game.players[id].chips=payload||1000); logSystem('Bankrolls gereset'); break;
+      case 'giveAll': game.order.forEach(id=>game.players[id].chips+=payload||100); logSystem('Iedereen +'+(payload||100)+' chips'); break;
+      case 'clearHands': game.order.forEach(id=>{game.players[id].hand=[];game.players[id].status='lobby';}); game.dealerHand=[]; game.phase='lobby'; logSystem('Hands gewist'); break;
+      case 'togglePause': game.paused=!game.paused; logSystem(game.paused?'Gepauzeerd':'Hervat'); break;
+      case 'endRound': if(game.phase!=='lobby'){ game.phase='lobby'; game.order.forEach(id=>{const p=game.players[id]; if(p.bet>0 && p.status!=='lobby'){p.chips-=0;} p.hand=[];p.bet=0;p.ppBet=0;p.status='lobby';}); game.dealerHand=[]; game.currentTurn=0; logSystem('Ronde beëindigd door mod'); } break;
+      case 'newShoe': game.shoe=buildShoe(game.rules.decks); logSystem('Nieuwe shoe'); break;
+      case 'fun': {
+        const mod=payload.mod;
+        const enabled=payload.enabled;
+        if(enabled){ if(!game.funMods.includes(mod)) game.funMods.push(mod); }
+        else { game.funMods = game.funMods.filter(m=>m!==mod); }
+        logSystem('Fun mod '+(enabled?'ingeschakeld':'uitgeschakeld')+': '+mod);
+        // confetti burst if enabled
+        if(enabled && (mod==='confetti'||mod==='pride')) spawnConfetti();
+        break;
+      }
+      case 'announce': if(payload){ logMsg('MOD', payload); } break;
+    }
+    broadcast();
+  }
+  function sendTheme(){ Object.values(game.conns).forEach(c=>{ if(c.open) c.send({type:'theme',theme:game.theme}); }); }
+  function randomColor(){ return COLORS[Math.floor(Math.random()*COLORS.length)]; }
+
+  // ---------- state apply ----------
+  function applyState(st,isHostFlag){
+    clientState=st;
+    if(isHostFlag){ game.tableName=st.tableName; game.theme=st.theme; game.rules=st.rules; game.paused=st.paused; game.phase=st.phase; }
+    renderState(st);
+  }
+  function renderState(st){
+    $('message').textContent=phaseText(st);
+    $('tableTitle').textContent=st.tableName||'Gajur Tafel';
+    document.body.className='theme-'+(st.theme||'emerald');
+    $('themeLabel').textContent=(st.theme||'emerald').replace(/^./,c=>c.toUpperCase());
+    const knownMods=['disco','rainbow','matrix','hugecards','invert','shake','confetti','pride'];
+    knownMods.forEach(m=>document.body.classList.remove('fun-'+m));
+    (st.funMods||[]).forEach(m=>document.body.classList.add('fun-'+m));
+    $('dealerScore').textContent= scoreText(st.dealerHand);
+    const dc=$('dealerCards'); dc.innerHTML='';
+    st.dealerHand.forEach(c=>dc.appendChild(createCardEl(c,c===null)));
+    $('shoeCount').textContent=st.shoeCount;
+
+    const seats=$('seats'); seats.innerHTML='';
+    const hostId = st.players[0]?.id;
+    const isMod = (myId===hostId);
+    $('modToggleBtn').style.display = isMod ? '' : 'none';
+    st.players.forEach(p=>{
+      const active = (st.currentTurnId===p.id && st.phase==='playing' && !st.paused);
+      const div=document.createElement('div');
+      div.className='seat'+(active?' active':'')+(p.status==='offline'?' offline':'');
+      div.innerHTML=`
+        <div class="name"><span class="avatar" style="background:${p.color}"></span>${esc(p.name)} ${active?'⬅':''} <span class="score">${handTotal(p.hand)||'-'}</span></div>
+        <div class="small-label">💰 ${p.chips} • inzet ${p.bet} ${p.ppBet?'+PP '+p.ppBet:''}</div>
+        <div class="small-label">Status: ${p.status}${p.ready?' • ready':''}</div>`;
+      const cdiv=document.createElement('div'); cdiv.className='cards';
+      p.hand.forEach(card=>cdiv.appendChild(createCardEl(card)));
+      div.appendChild(cdiv);
+      seats.appendChild(div);
+    });
+
+    // chat/log
+    const chatEl=$('chat'); chatEl.innerHTML='';
+    (st.chat||[]).forEach(m=>{
+      const e=document.createElement('div'); e.className='entry'; e.textContent=`[${new Date(m.t).toLocaleTimeString()}] ${m.from}: ${m.m}`; chatEl.appendChild(e);
+    });
+    $('modLog').innerHTML=(st.log||[]).map(l=>`<div class="entry sys">${new Date(l.t).toLocaleTimeString()} — ${esc(l.m)}</div>`).join('');
+
+    // mod panel players management (host only)
+    if(isMod) renderManagePlayers(st);
+
+    $('playerList').textContent = st.players.map(p=>p.name+'('+p.chips+')').join(' • ');
+
+    updateTurnTimer(st, myId===(st.players[0]&&st.players[0].id));
+
+    const me=st.players.find(p=>p.id===myId);
+    const myTurn = !st.paused && st.currentTurnId===myId && st.phase==='playing' && me && me.status==='active';
+    $('controls').style.display = myTurn ? '' : 'none';
+    $('startBtn').style.display = (isMod && st.phase==='lobby' && !st.paused) ? '' : 'none';
+    $('placeBetBtn').disabled = !(st.phase==='lobby' && !st.paused);
+    $('betInput').disabled = !(st.phase==='lobby' && !st.paused);
+    $('modToggleBtn').onclick = ()=> toggleModPanel();
+  }
+  function phaseText(st){
+    if(st.paused) return '⏸ Gepauzeerd door mod.';
+    if(st.phase==='lobby') return 'Lobby: zet in, host start de ronde.';
+    if(st.phase==='playing') return 'Spelen: '+(st.players.find(p=>p.id===st.currentTurnId)?.name||'')+' is aan zet.';
+    if(st.phase==='dealer') return 'Dealer speelt…';
+    return 'Ronde voorbij.';
+  }
+  function scoreText(cards){
+    if(!cards||!cards.length) return '-';
+    if(cards.some(c=>c===null)) return cardValue(cards[1])+' + ?';
+    return handTotal(cards);
+  }
+  function cardValue(c){ if(['J','Q','K'].includes(c.rank))return 10; if(c.rank==='A')return 11; return parseInt(c.rank,10);}
+  let turnTimerInterval=null; let turnTimerStart=0; let turnTimerFor=null;
+  function updateTurnTimer(st,isHostLocal){
+    const bar=$('turnBar'); const fill=$('turnFill'); if(!bar||!fill) return;
+    if(st.phase!=='playing' || st.paused){ if(turnTimerInterval){clearInterval(turnTimerInterval);turnTimerInterval=null;} turnTimerFor=null; fill.style.width='0%'; return; }
+    if(st.currentTurnId === turnTimerFor) return;
+    if(turnTimerInterval){ clearInterval(turnTimerInterval); turnTimerInterval=null; }
+    turnTimerFor=st.currentTurnId;
+    turnTimerStart=Date.now();
+    const dur=20000;
+    turnTimerInterval=setInterval(()=>{
+      const pct=Math.max(0, 100 - (Date.now()-turnTimerStart)/dur*100);
+      fill.style.width=pct+'%';
+      if(pct<=0){
+        clearInterval(turnTimerInterval); turnTimerInterval=null;
+        if(isHostLocal && game && st.currentTurnId){
+          performAction(st.currentTurnId,'stand');
+          toast('Tijd om! Automatisch stand.','info');
+        }
+      }
+    },100);
+  }
+
+  function toggleModPanel(){ 
+    const p=$('modPanel'); p.style.display = p.style.display==='none'?'':'none';
+    const f=$('funModsPanel'); if(f) f.style.display = p.style.display;
+  }
+  function renderManagePlayers(st){
+    const box=$('managePlayers'); box.innerHTML='';
+    st.players.forEach(p=>{
+      const d=document.createElement('div');
+      d.className='player-manage';
+      d.innerHTML=`
+        <div class="row">
+          <div><span class="avatar" style="background:${p.color}"></span><strong>${esc(p.name)}</strong> <span class="small-label">💰${p.chips}</span></div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <button class="small ghost" data-mod="forceStand" data-id="${p.id}">Stand forceren</button>
+            <button class="small danger" data-mod="kick" data-id="${p.id}">Kick</button>
+          </div>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <input type="number" placeholder="±chips" style="width:90px" data-chips="${p.id}" />
+          <button class="small secondary" data-mod="give" data-id="${p.id}">Toepassen</button>
+        </div>`;
+      box.appendChild(d);
+    });
+    // attach handlers
+    box.querySelectorAll('button[data-mod="forceStand"]').forEach(b=>b.addEventListener('click',()=>{ if(isHost) modAction('forceStand', b.dataset.id); }));
+    box.querySelectorAll('button[data-mod="kick"]').forEach(b=>b.addEventListener('click',()=>{ if(isHost && confirm('Kick '+b.dataset.id+'?')) modAction('kick', b.dataset.id); }));
+    box.querySelectorAll('button[data-mod="give"]').forEach(b=>b.addEventListener('click',()=>{
+      if(!isHost) return;
+      const inp=box.querySelector(`input[data-chips="${b.dataset.id}"]`);
+      const amt=parseInt(inp.value,10)||0;
+      if(amt) modAction('adjustChips',{id:b.dataset.id,amount:amt});
+      inp.value='';
+    }));
+  }
+
+  function spawnConfetti(){
+    for(let i=0;i<60;i++){
+      const c=document.createElement('div');
+      c.className='confetti-burst';
+      c.style.left=Math.random()*window.innerWidth+'px';
+      c.style.top='-20px';
+      c.style.width=(6+Math.random()*8)+'px';
+      c.style.height=c.style.width;
+      c.style.background=COLORS[Math.floor(Math.random()*COLORS.length)];
+      c.style.animationDelay=(Math.random()*0.6)+'s';
+      document.body.appendChild(c);
+      setTimeout(()=>c.remove(),1900);
+    }
+  }
+
+  // ---------- network ----------
+  function initPeer(cb){
+    peer=new Peer(undefined,{debug:1});
+    peer.on('open', id=>{ myId=id; myProfile.name=$('nameInput').value.trim()||myProfile.name; myProfile.color=$('colorInput').value||myProfile.color; saveProfile(); cb && cb(id); });
+    peer.on('error', e=>{ status('Peer fout: '+e.type); });
+    if(isHost){
+      peer.on('connection', ch=>{
+        ch.on('open', ()=>{ /* wait for join msg */ });
+        ch.on('data', d=>{ if(d.type==='join') handleJoin(ch, d.name, d.color); else handleClientData(ch.peer,d); });
+        ch.on('close', ()=>{ if(game && game.players[ch.peer]) { removePlayer(ch.peer); broadcast(); } });
+      });
+    }
+  }
+  function hostTable(){
+    isHost=true; ensureGame();
+    // host profile
+    game.players[myId].name=myProfile.name; game.players[myId].color=myProfile.color;
+    initPeer(id=>{
+      game.conns={};
+      $('roomCode').style.display=''; $('roomCode').textContent='Room code: '+id;
+      $('gamePanel').style.display='';
+      status('Host actief. Deel code: '+id);
+      broadcast();
+      savePrefs({hostLast:id});
+    });
+  }
+  function joinTable(){
+    const room=$('roomInput').value.trim(); if(!room){ status('Voer room code in.'); return; }
+    isHost=false;
+    myProfile.name=$('nameInput').value.trim()||myProfile.name; myProfile.color=$('colorInput').value||myProfile.color; saveProfile();
+    initPeer(id=>{
+      connToHost=peer.connect(room,{reliable:true});
+      connToHost.on('open', ()=>{ connToHost.send({type:'join', name:myProfile.name, color:myProfile.color}); status('Verbonden met '+room); $('gamePanel').style.display=''; });
+      connToHost.on('data', d=>{
+        if(d.type==='state') applyState(d.state,false);
+        if(d.type==='theme') document.body.className='theme-'+d.theme;
+        if(d.type==='kicked'){ status('Je bent uit de tafel gezet.'); alert('Je bent uit de tafel gezet.'); window.location.reload(); }
+      });
+      connToHost.on('close', ()=>{ status('Verbinding verbroken.'); });
+    });
+  }
+
+  function sendMsg(msg){
+    if(isHost){ if(msg.type==='chat'){ logMsg(myProfile.name,msg.text); broadcast(); } return; }
+    if(connToHost && connToHost.open) connToHost.send(msg);
+  }
+
+  // ---------- profile update ----------
+  function updateProfile(){
+    myProfile.name=$('nameInput').value.trim()||myProfile.name;
+    myProfile.color=$('colorInput').value||myProfile.color;
+    saveProfile();
+    if(isHost && game){ game.players[myId].name=myProfile.name; game.players[myId].color=myProfile.color; broadcast(); }
+    else if(connToHost) connToHost.send({type:'profile', name:myProfile.name, color:myProfile.color});
+    status('Profiel bijgewerkt.');
+  }
+
+  // ---------- events ----------
+  loadProfile();
+  $('randomNameBtn').addEventListener('click', ()=>{
+    const names=['Ace','Dealer','Lucky','Jack','Queen','King','Chip','Banker','Royal','Vegas'];
+    $('nameInput').value=names[Math.floor(Math.random()*names.length)]+Math.floor(Math.random()*99);
+    $('colorInput').value=COLORS[Math.floor(Math.random()*COLORS.length)];
+  });
+  $('hostBtn').addEventListener('click', hostTable);
+  $('joinBtn').addEventListener('click', joinTable);
+  $('copyBtn').addEventListener('click', ()=>{
+    const code=$('roomCode').textContent.replace('Room code: ','');
+    if(code){ navigator.clipboard && navigator.clipboard.writeText(code); status('Room code gekopieerd.'); }
+  });
+  $('placeBetBtn').addEventListener('click', ()=>{
+    const amt=parseInt($('betInput').value,10)||0;
+    if(isHost){ if(game && game.phase==='lobby' && !game.paused){ game.players[myId].bet=amt; game.players[myId].ppBet= parseInt($('ppInput')?.value||0,10)||0; broadcast(); } }
+    else if(connToHost) connToHost.send({type:'bet',amount:amt});
+  });
+  $('startBtn').addEventListener('click', ()=>{ if(isHost && game){ startRound(); } });
+  $('hitBtn').addEventListener('click', ()=> sendAction('hit'));
+  $('standBtn').addEventListener('click', ()=> sendAction('stand'));
+  $('doubleBtn').addEventListener('click', ()=> sendAction('double'));
+  function sendAction(a){
+    if(isHost){ if(game && !game.paused) performAction(myId,a); }
+    else if(connToHost) connToHost.send({type:'action',action:a});
+  }
+
+  // mod UI handlers
+  $('modToggleBtn').addEventListener('click', ()=> toggleModPanel());
+  $('modTableNameBtn').addEventListener('click', ()=>{ if(isHost) modAction('setTableName', $('modTableName').value.trim()||'Gajur Tafel'); });
+  $('modTheme').addEventListener('change', e=>{ if(isHost) modAction('setTheme', e.target.value); });
+  $('modDecks').addEventListener('change', e=>{ if(isHost) modAction('applyRules', {decks:parseInt(e.target.value,10)}); });
+  $('modS17').addEventListener('change', e=>{ if(isHost) modAction('applyRules', {s17: e.target.value==='true'}); });
+  $('modBJ').addEventListener('change', e=>{ if(isHost) modAction('applyRules', {bjPay: e.target.value}); });
+  $('modDouble').addEventListener('change', e=>{ if(isHost) modAction('applyRules', {double: e.target.value}); });
+  $('modMaxSplit').addEventListener('change', e=>{ if(isHost) modAction('applyRules', {maxSplit: parseInt(e.target.value,10)}); });
+  $('modInsurance').addEventListener('change', e=>{ if(isHost) modAction('applyRules', {insurance: e.target.value==='true'}); });
+  $('modPP').addEventListener('change', e=>{ if(isHost) modAction('applyRules', {ppSidebet: e.target.value==='true'}); });
+  $('modResetBank').addEventListener('click', ()=>{ if(isHost && game) modAction('resetBank', parseInt($('modResetChips').value,10)||1000); });
+  $('modGiveAll').addEventListener('click', ()=>{ if(isHost) modAction('giveAll', 100); });
+  $('modClearHands').addEventListener('click', ()=>{ if(isHost) modAction('clearHands',null); });
+  $('modPauseBtn').addEventListener('click', ()=>{ if(isHost) modAction('togglePause',null); });
+  $('modAnnounceBtn').addEventListener('click', ()=>{ if(isHost){ const t=$('modAnnounceInput').value.trim(); if(t){ modAction('announce', t); $('modAnnounceInput').value=''; } } });
+  $('modEndRoundBtn').addEventListener('click', ()=>{ if(isHost) modAction('endRound',null); });
+  $('modNewShoeBtn').addEventListener('click', ()=>{ if(isHost) modAction('newShoe',null); });
+  document.querySelectorAll('button[data-fun]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      if(!isHost) return;
+      const mod=b.dataset.fun;
+      if(mod==='confetti'){ spawnConfetti(); modAction('announce','Confetti!'); return; }
+      const active = clientState && (clientState.funMods||[]).includes(mod);
+      modAction('fun',{mod,enabled:!active});
+    });
+  });
+  $('updateProfileBtn').addEventListener('click', updateProfile);
+  $('toggleChatBtn').addEventListener('click', ()=>{ const p=$('chatPanel'); p.style.display=p.style.display==='none'?'':'none'; });
+
+  // chat
+  $('chatSendBtn').addEventListener('click', sendChat);
+  $('chatInput').addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
+  $('consoleRunBtn').addEventListener('click', ()=> runConsoleCommand($('consoleInput').value));
+  $('consoleInput').addEventListener('keydown', e=>{ if(e.key==='Enter') runConsoleCommand($('consoleInput').value); });
+  function sendChat(){ const t=$('chatInput').value.trim(); if(!t) return; $('chatInput').value=''; sendMsg({type:'chat',text:t}); if(isHost) logMsg(myProfile.name,t); broadcast(); }
+
+  function consoleLog(line){
+    const o=$('consoleOut'); const e=document.createElement('div'); e.className='entry sys'; e.textContent=line; o.prepend(e); while(o.children.length>20) o.removeChild(o.lastChild);
+  }
+  function runConsoleCommand(raw){
+    const cmd=(raw||'').trim().toLowerCase();
+    if(!cmd){ return; }
+    consoleLog('> '+raw);
+    if(cmd==='s' || cmd==='mod' || cmd==='menu'){
+      if(isHost){ toggleModPanel(); consoleLog('Mod menu geopend/gesloten.'); }
+      else consoleLog('Geen rechten: alleen host kan mod menu gebruiken.');
+    } else if(cmd==='help'){
+      consoleLog('Commando\'s: s/mod/menu (mod menu), help, clear, players, theme <naam>, pause, announce <tekst>');
+    } else if(cmd==='clear'){
+      $('consoleOut').innerHTML='';
+    } else if(cmd==='players'){
+      if(clientState) consoleLog(clientState.players.map(p=>p.name+' ('+p.chips+')').join(', '));
+      else if(game) consoleLog(game.order.map(id=>game.players[id].name+' ('+game.players[id].chips+')').join(', '));
+    } else if(cmd.startsWith('theme ')){
+      const t=cmd.split(' ')[1];
+      if(['emerald','blue','burgundy','night'].includes(t)){ if(isHost) modAction('setTheme',t); else consoleLog('Alleen host.'); }
+      else consoleLog('Onbekend thema.');
+    } else if(cmd==='pause'){
+      if(isHost) modAction('togglePause',null); else consoleLog('Alleen host.');
+    } else if(cmd.startsWith('announce ')){
+      if(isHost) modAction('announce', raw.slice(9).trim()); else consoleLog('Alleen host.');
+    } else {
+      consoleLog('Onbekend commando. Typ "help".');
+    }
+    $('consoleInput').value='';
+  }
+  Object.defineProperty(window, 's', {
+    get(){ runConsoleCommand('s'); return 'Spell: mod menu toggled (host only)'; }
+  });
+  window.modMenu = function(){ runConsoleCommand('s'); return 'Mod menu toggled'; };
+
+  // keyboard
+  document.addEventListener('keydown', e=>{
+    if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA') return;
+    const k=e.key.toLowerCase();
+    if(k==='h') sendAction('hit');
+    else if(k==='s') sendAction('stand');
+    else if(k==='d') sendAction('double');
+  });
+
+  // side bet optional UI (simple)
+  // add pp input dynamically? Put next to bet
+  const ppLabel=document.createElement('label');
+  ppLabel.innerHTML='PP side bet: <input id="ppInput" type="number" value="0" min="0" style="width:70px" />';
+  $('placeBetBtn').parentElement.insertBefore(ppLabel, $('placeBetBtn'));
+
+  // ensure mod panel modToggle initially not visible until host game loaded
+
+  // reload state from prefs not necessary
+
+  status('Vul profiel in en host of join.');
+})();
+</script>
+<div id="toastContainer" class="toast-container"></div>
+</body>
+</html>
